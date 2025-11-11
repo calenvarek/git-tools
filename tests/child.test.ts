@@ -19,6 +19,7 @@ describe('child.ts - run function', () => {
         warn: vi.fn(),
         debug: vi.fn(),
         verbose: vi.fn(),
+        silly: vi.fn()
     };
     const mockGetLogger = vi.mocked(getLogger);
 
@@ -383,6 +384,101 @@ describe('child.ts - run function', () => {
             encoding: 'utf8'
         }));
     });
+
+    test('should handle maxBuffer option', async () => {
+        const options = {
+            maxBuffer: 1024 * 1024 // 1MB
+        };
+
+        mockExecPromise.mockResolvedValue({ stdout: 'test', stderr: '' });
+
+        await run('command-with-large-buffer', options);
+
+        expect(mockExecPromise).toHaveBeenCalledWith('command-with-large-buffer', expect.objectContaining({
+            ...options,
+            encoding: 'utf8'
+        }));
+    });
+
+    test('should handle shell option', async () => {
+        const options = {
+            shell: '/bin/bash'
+        };
+
+        mockExecPromise.mockResolvedValue({ stdout: 'test', stderr: '' });
+
+        await run('command-with-shell', options);
+
+        expect(mockExecPromise).toHaveBeenCalledWith('command-with-shell', expect.objectContaining({
+            ...options,
+            encoding: 'utf8'
+        }));
+    });
+
+    test('should handle process signals', async () => {
+        const signalError = Object.assign(new Error('Process terminated'), {
+            killed: true,
+            signal: 'SIGINT',
+            code: null
+        });
+
+        mockExecPromise.mockRejectedValue(signalError);
+
+        await expect(run('interruptible-command')).rejects.toMatchObject({
+            message: 'Process terminated',
+            killed: true,
+            signal: 'SIGINT'
+        });
+    });
+
+    test('should handle commands with environment variables', async () => {
+        const options = {
+            env: {
+                ...process.env,
+                NODE_ENV: 'test',
+                DEBUG: 'true'
+            }
+        };
+
+        mockExecPromise.mockResolvedValue({ stdout: 'env test', stderr: '' });
+
+        await run('env-command', options);
+
+        expect(mockExecPromise).toHaveBeenCalledWith('env-command', expect.objectContaining({
+            ...options,
+            encoding: 'utf8'
+        }));
+    });
+
+    test('should handle cwd option', async () => {
+        const options = {
+            cwd: '/custom/working/directory'
+        };
+
+        mockExecPromise.mockResolvedValue({ stdout: 'pwd output', stderr: '' });
+
+        await run('pwd', options);
+
+        expect(mockExecPromise).toHaveBeenCalledWith('pwd', expect.objectContaining({
+            ...options,
+            encoding: 'utf8'
+        }));
+    });
+
+    test('should handle windowsHide option', async () => {
+        const options = {
+            windowsHide: true
+        };
+
+        mockExecPromise.mockResolvedValue({ stdout: 'hidden window', stderr: '' });
+
+        await run('windows-command', options);
+
+        expect(mockExecPromise).toHaveBeenCalledWith('windows-command', expect.objectContaining({
+            ...options,
+            encoding: 'utf8'
+        }));
+    });
 });
 
 describe('child.ts - runWithDryRunSupport function', () => {
@@ -395,6 +491,7 @@ describe('child.ts - runWithDryRunSupport function', () => {
         warn: vi.fn(),
         debug: vi.fn(),
         verbose: vi.fn(),
+        silly: vi.fn()
     };
     const mockGetLogger = vi.mocked(getLogger);
 
@@ -447,6 +544,286 @@ describe('child.ts - runWithDryRunSupport function', () => {
         }));
         expect(result).toEqual(expectedResult);
     });
+
+    test('should execute command with options when isDryRun is false', async () => {
+        const command = 'npm test';
+        const isDryRun = false;
+        const options = {
+            cwd: '/project/root',
+            env: { NODE_ENV: 'test' },
+            timeout: 30000
+        };
+        const expectedResult = { stdout: 'test output', stderr: 'test warnings' };
+
+        mockExecPromise.mockResolvedValue(expectedResult);
+
+        const result = await runWithDryRunSupport(command, isDryRun, options);
+
+        expect(mockExecPromise).toHaveBeenCalledWith(command, expect.objectContaining({
+            ...options,
+            encoding: 'utf8'
+        }));
+        expect(result).toEqual(expectedResult);
+    });
+
+    test('should propagate errors when isDryRun is false and command fails', async () => {
+        const command = 'failing-command';
+        const isDryRun = false;
+        const error = new Error('Command execution failed');
+
+        mockExecPromise.mockRejectedValue(error);
+
+        await expect(runWithDryRunSupport(command, isDryRun)).rejects.toThrow('Command execution failed');
+        expect(mockExecPromise).toHaveBeenCalledWith(command, expect.objectContaining({
+            encoding: 'utf8'
+        }));
+    });
+
+    test('should handle complex commands in dry run mode', async () => {
+        const command = 'git commit -m "Complex commit with special chars: $VAR & symbols"';
+        const isDryRun = true;
+
+        const result = await runWithDryRunSupport(command, isDryRun);
+
+        expect(mockLogger.info).toHaveBeenCalledWith(`DRY RUN: Would execute command: ${command}`);
+        expect(result).toEqual({ stdout: '', stderr: '' });
+    });
+
+    test('should handle empty command in dry run mode', async () => {
+        const command = '';
+        const isDryRun = true;
+
+        const result = await runWithDryRunSupport(command, isDryRun);
+
+        expect(mockLogger.info).toHaveBeenCalledWith('DRY RUN: Would execute command: ');
+        expect(result).toEqual({ stdout: '', stderr: '' });
+    });
+
+    test('should handle commands with unicode in dry run mode', async () => {
+        const command = 'echo "🚀 Deploy to production! 中文测试"';
+        const isDryRun = true;
+
+        const result = await runWithDryRunSupport(command, isDryRun);
+
+        expect(mockLogger.info).toHaveBeenCalledWith(`DRY RUN: Would execute command: ${command}`);
+        expect(result).toEqual({ stdout: '', stderr: '' });
+    });
+
+    test('should call getLogger only once per invocation in dry run mode', async () => {
+        const command = 'test command';
+        const isDryRun = true;
+
+        await runWithDryRunSupport(command, isDryRun);
+
+        expect(mockGetLogger).toHaveBeenCalledTimes(1);
+        expect(mockLogger.info).toHaveBeenCalledTimes(1);
+    });
+
+    test('should call getLogger when isDryRun is false', async () => {
+        const command = 'test command';
+        const isDryRun = false;
+
+        mockExecPromise.mockResolvedValue({ stdout: 'output', stderr: '' });
+
+        await runWithDryRunSupport(command, isDryRun);
+
+        expect(mockGetLogger).toHaveBeenCalledTimes(2); // Called once in runWithDryRunSupport and once in run
+        expect(mockLogger.info).not.toHaveBeenCalled(); // Should not call info for dry run messages
+    });
+
+    test('should use inherited stdio when useInheritedStdio is true and isDryRun is false', async () => {
+        const command = 'echo "test with stdio"';
+        const isDryRun = false;
+        const useInheritedStdio = true;
+
+        // Mock runWithInheritedStdio
+        const mockSpawn = vi.mocked(spawn);
+        const mockChild = {
+            on: vi.fn((event, callback) => {
+                if (event === 'close') {
+                    setTimeout(() => callback(0), 10);
+                }
+                return mockChild;
+            })
+        };
+        mockSpawn.mockReturnValue(mockChild as any);
+
+        const result = await runWithDryRunSupport(command, isDryRun, {}, useInheritedStdio);
+
+        expect(mockSpawn).toHaveBeenCalledWith('echo', ['"test', 'with', 'stdio"'], {
+            shell: false,
+            stdio: 'inherit'
+        });
+        expect(result).toEqual({ stdout: '', stderr: '' });
+        expect(mockExecPromise).not.toHaveBeenCalled(); // Should not call normal run
+    });
+
+    test('should use inherited stdio with options when useInheritedStdio is true', async () => {
+        const command = 'npm test';
+        const isDryRun = false;
+        const options = {
+            cwd: '/test/directory',
+            env: { NODE_ENV: 'test' }
+        };
+        const useInheritedStdio = true;
+
+        const mockSpawn = vi.mocked(spawn);
+        const mockChild = {
+            on: vi.fn((event, callback) => {
+                if (event === 'close') {
+                    setTimeout(() => callback(0), 10);
+                }
+                return mockChild;
+            })
+        };
+        mockSpawn.mockReturnValue(mockChild as any);
+
+        const result = await runWithDryRunSupport(command, isDryRun, options, useInheritedStdio);
+
+        expect(mockSpawn).toHaveBeenCalledWith('npm', ['test'], {
+            ...options,
+            shell: false,
+            stdio: 'inherit'
+        });
+        expect(result).toEqual({ stdout: '', stderr: '' });
+    });
+
+    test('should handle inherited stdio failure when useInheritedStdio is true', async () => {
+        const command = 'failing-command';
+        const isDryRun = false;
+        const useInheritedStdio = true;
+
+        const mockSpawn = vi.mocked(spawn);
+        const mockChild = {
+            on: vi.fn((event, callback) => {
+                if (event === 'close') {
+                    setTimeout(() => callback(1), 10); // Failure
+                }
+                return mockChild;
+            })
+        };
+        mockSpawn.mockReturnValue(mockChild as any);
+
+        await expect(runWithDryRunSupport(command, isDryRun, {}, useInheritedStdio))
+            .rejects.toThrow('Command "failing-command" failed with exit code 1');
+    });
+
+    test('should ignore useInheritedStdio when isDryRun is true', async () => {
+        const command = 'test command';
+        const isDryRun = true;
+        const useInheritedStdio = true;
+
+        const result = await runWithDryRunSupport(command, isDryRun, {}, useInheritedStdio);
+
+        expect(mockLogger.info).toHaveBeenCalledWith(`DRY RUN: Would execute command: ${command}`);
+        expect(result).toEqual({ stdout: '', stderr: '' });
+        expect(mockExecPromise).not.toHaveBeenCalled();
+        // spawn should not be called in dry run mode
+        const mockSpawn = vi.mocked(spawn);
+        expect(mockSpawn).not.toHaveBeenCalled();
+    });
+
+    test('should default useInheritedStdio to false when not provided', async () => {
+        const command = 'test command';
+        const isDryRun = false;
+
+        mockExecPromise.mockResolvedValue({ stdout: 'output', stderr: '' });
+
+        await runWithDryRunSupport(command, isDryRun);
+
+        expect(mockExecPromise).toHaveBeenCalledWith(command, expect.objectContaining({
+            encoding: 'utf8'
+        }));
+        // spawn should not be called when useInheritedStdio is false (default)
+        const mockSpawn = vi.mocked(spawn);
+        expect(mockSpawn).not.toHaveBeenCalled();
+    });
+});
+
+// Additional edge cases for run function
+describe('child.ts - run function additional edge cases', () => {
+    const mockExec = vi.mocked(exec);
+    const mockPromisify = vi.mocked(promisify);
+    const mockExecPromise = vi.fn();
+    const mockLogger = {
+        info: vi.fn(),
+        error: vi.fn(),
+        warn: vi.fn(),
+        debug: vi.fn(),
+        verbose: vi.fn(),
+        silly: vi.fn()
+    };
+    const mockGetLogger = vi.mocked(getLogger);
+
+    beforeEach(() => {
+        vi.clearAllMocks();
+        mockPromisify.mockReturnValue(mockExecPromise);
+        mockGetLogger.mockReturnValue(mockLogger as any);
+    });
+
+    test('should handle null options parameter', async () => {
+        const expectedResult = { stdout: 'test', stderr: '' };
+        mockExecPromise.mockResolvedValue(expectedResult);
+
+        const result = await run('test-command', null as any);
+
+        expect(mockExecPromise).toHaveBeenCalledWith('test-command', expect.objectContaining({
+            encoding: 'utf8'
+        }));
+        expect(result).toEqual(expectedResult);
+    });
+
+    test('should handle undefined options parameter explicitly', async () => {
+        const expectedResult = { stdout: 'test', stderr: '' };
+        mockExecPromise.mockResolvedValue(expectedResult);
+
+        const result = await run('test-command', undefined);
+
+        // When undefined is passed, default parameter kicks in and converts to { encoding: 'utf8' }
+        expect(mockExecPromise).toHaveBeenCalledWith('test-command', expect.objectContaining({
+            encoding: 'utf8'
+        }));
+        expect(result).toEqual(expectedResult);
+    });
+
+    test('should handle commands with newlines', async () => {
+        const command = 'echo "line1\nline2\nline3"';
+        const expectedResult = { stdout: 'line1\nline2\nline3', stderr: '' };
+        mockExecPromise.mockResolvedValue(expectedResult);
+
+        const result = await run(command);
+
+        expect(result.stdout).toBe('line1\nline2\nline3');
+    });
+
+    test('should handle commands with tabs and special whitespace', async () => {
+        const command = 'echo "\t\r\n\v\f"';
+        const expectedResult = { stdout: '\t\r\n\v\f', stderr: '' };
+        mockExecPromise.mockResolvedValue(expectedResult);
+
+        const result = await run(command);
+
+        expect(result.stdout).toBe('\t\r\n\v\f');
+    });
+
+    test('should handle error with custom properties', async () => {
+        const customError = Object.assign(new Error('Custom error'), {
+            code: 'CUSTOM_CODE',
+            errno: -2,
+            path: '/test/path',
+            syscall: 'spawn'
+        });
+
+        mockExecPromise.mockRejectedValue(customError);
+
+        await expect(run('custom-error-command')).rejects.toMatchObject({
+            message: 'Custom error',
+            code: 'CUSTOM_CODE',
+            errno: -2,
+            path: '/test/path',
+            syscall: 'spawn'
+        });
+    });
 });
 
 describe('child.ts - runWithInheritedStdio function', () => {
@@ -457,6 +834,7 @@ describe('child.ts - runWithInheritedStdio function', () => {
         warn: vi.fn(),
         debug: vi.fn(),
         verbose: vi.fn(),
+        silly: vi.fn()
     };
     const mockGetLogger = vi.mocked(getLogger);
 
@@ -551,5 +929,107 @@ describe('child.ts - runWithInheritedStdio function', () => {
         await expect(runWithInheritedStdio('invalid-command')).rejects.toThrow('spawn ENOENT');
         expect(mockLogger.error).toHaveBeenCalledWith('Command failed to start: spawn ENOENT');
     });
-});
 
+    test('should handle working directory with default process.cwd()', async () => {
+        const mockChild = {
+            on: vi.fn((event, callback) => {
+                if (event === 'close') {
+                    setTimeout(() => callback(0), 10);
+                }
+                return mockChild;
+            })
+        };
+
+        mockSpawn.mockReturnValue(mockChild as any);
+
+        await runWithInheritedStdio('test-command');
+
+        expect(mockLogger.verbose).toHaveBeenCalledWith(`Working directory: ${process.cwd()}`);
+    });
+
+    test('should handle empty command string', async () => {
+        const mockChild = {
+            on: vi.fn((event, callback) => {
+                if (event === 'close') {
+                    setTimeout(() => callback(0), 10);
+                }
+                return mockChild;
+            })
+        };
+
+        mockSpawn.mockReturnValue(mockChild as any);
+
+        await runWithInheritedStdio('');
+
+        expect(mockSpawn).toHaveBeenCalledWith('', [], {
+            shell: false,
+            stdio: 'inherit'
+        });
+        expect(mockLogger.verbose).toHaveBeenCalledWith('Executing command securely with inherited stdio:  ');
+    });
+
+    test('should handle complex commands with special characters', async () => {
+        const command = 'echo "Complex & command; with | pipes"';
+        const mockChild = {
+            on: vi.fn((event, callback) => {
+                if (event === 'close') {
+                    setTimeout(() => callback(0), 10);
+                }
+                return mockChild;
+            })
+        };
+
+        mockSpawn.mockReturnValue(mockChild as any);
+
+        await runWithInheritedStdio(command);
+
+        expect(mockSpawn).toHaveBeenCalledWith('echo', ['"Complex', '&', 'command;', 'with', '|', 'pipes"'], {
+            shell: false,
+            stdio: 'inherit'
+        });
+    });
+
+    test('should handle signal termination', async () => {
+        const mockChild = {
+            on: vi.fn((event, callback) => {
+                if (event === 'close') {
+                    setTimeout(() => callback(null, 'SIGTERM'), 10); // Terminated by signal
+                }
+                return mockChild;
+            })
+        };
+
+        mockSpawn.mockReturnValue(mockChild as any);
+
+        await expect(runWithInheritedStdio('interruptible-command')).rejects.toThrow('Command "interruptible-command" failed with exit code null');
+        expect(mockLogger.error).toHaveBeenCalledWith('Command failed with exit code null');
+    });
+
+    test('should preserve options immutability', async () => {
+        const options = {
+            cwd: '/test',
+            env: { TEST: 'value' }
+        };
+        const originalOptions = { ...options };
+
+        const mockChild = {
+            on: vi.fn((event, callback) => {
+                if (event === 'close') {
+                    setTimeout(() => callback(0), 10);
+                }
+                return mockChild;
+            })
+        };
+
+        mockSpawn.mockReturnValue(mockChild as any);
+
+        await runWithInheritedStdio('test-command', options);
+
+        expect(options).toEqual(originalOptions);
+        expect(mockSpawn).toHaveBeenCalledWith('test-command', [], {
+            ...options,
+            shell: false,
+            stdio: 'inherit'
+        });
+    });
+});
