@@ -7,8 +7,8 @@
  */
 
 // Export logger interface and functions
+export type { Logger } from './logger';
 export {
-    Logger,
     ConsoleLogger,
     setLogger,
     getLogger
@@ -53,7 +53,6 @@ export {
     getLinkedDependencies,
     getLinkCompatibilityProblems,
     getLinkProblems,
-    isNpmLinked,
-    getBranchNameForVersion
+    isNpmLinked
 } from './git';
 
