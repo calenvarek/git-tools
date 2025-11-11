@@ -1118,25 +1118,3 @@ export const isNpmLinked = async (packageDir: string): Promise<boolean> => {
     }
 };
 
-/**
- * Gets the branch name that should be used for a given version
- * For dev versions, returns the branch prefix (e.g., "release/1.2.x")
- * For production versions, returns the version tag (e.g., "v1.2.3")
- */
-export const getBranchNameForVersion = (version: string): string => {
-    // Parse version using semver
-    const parsed = semver.parse(version);
-    if (!parsed) {
-        throw new Error(`Invalid version format: ${version}`);
-    }
-
-    // Check if this is a dev version (has prerelease identifiers)
-    if (parsed.prerelease && parsed.prerelease.length > 0) {
-        // For dev versions like "1.2.3-dev.0", return "release/1.2.x"
-        return `release/${parsed.major}.${parsed.minor}.x`;
-    } else {
-        // For production versions like "1.2.3", return "v1.2.3"
-        return `v${version}`;
-    }
-};
-
