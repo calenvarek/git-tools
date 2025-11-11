@@ -6,6 +6,9 @@ node_modules
 .vscode
 coverage/
 tsconfig.tsbuildinfo
+output/
+input/
+processed/
 
 # Git hooks (environment-specific)
 .git/hooks/pre-commit
