@@ -7,8 +7,8 @@
  */
 
 // Export logger interface and functions
+export type { Logger } from './logger';
 export {
-    Logger,
     ConsoleLogger,
     setLogger,
     getLogger
