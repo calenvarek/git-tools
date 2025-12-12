@@ -141,19 +141,27 @@ export async function runSecureWithInheritedStdio(
     });
 }
 
-export async function run(command: string, options: child_process.ExecOptions = {}): Promise<{ stdout: string; stderr: string }> {
+export interface RunOptions extends child_process.ExecOptions {
+    /** If true, suppresses error logging for non-zero exits (useful when non-zero exit is expected behavior) */
+    suppressErrorLogging?: boolean;
+}
+
+export async function run(command: string, options: RunOptions = {}): Promise<{ stdout: string; stderr: string }> {
     const logger = getLogger();
     const execPromise = util.promisify(exec);
 
+    // Extract our custom option and pass the rest to exec
+    const { suppressErrorLogging = false, ...execOptions } = options || {};
+
     // Ensure encoding is set to 'utf8' to get string output instead of Buffer
-    const execOptions = { encoding: 'utf8' as const, ...options };
+    const finalOptions = { encoding: 'utf8' as const, ...execOptions };
 
     logger.verbose(`Executing command: ${command}`);
-    logger.verbose(`Working directory: ${execOptions?.cwd || process.cwd()}`);
-    logger.verbose(`Environment variables: ${Object.keys(execOptions?.env || process.env).length} variables`);
+    logger.verbose(`Working directory: ${finalOptions?.cwd || process.cwd()}`);
+    logger.verbose(`Environment variables: ${Object.keys(finalOptions?.env || process.env).length} variables`);
 
     try {
-        const result = await execPromise(command, execOptions);
+        const result = await execPromise(command, finalOptions);
         logger.verbose(`Command completed successfully`);
         logger.verbose(`stdout: ${result.stdout}`);
         if (result.stderr) {
@@ -165,15 +173,21 @@ export async function run(command: string, options: child_process.ExecOptions = 
             stderr: String(result.stderr)
         };
     } catch (error: any) {
-        logger.error(`Command failed: ${command}`);
-        logger.error(`Error: ${error.message}`);
-        logger.error(`Exit code: ${error.code}`);
-        logger.error(`Signal: ${error.signal}`);
-        if (error.stdout) {
-            logger.error(`stdout: ${error.stdout}`);
-        }
-        if (error.stderr) {
-            logger.error(`stderr: ${error.stderr}`);
+        if (!suppressErrorLogging) {
+            logger.error(`Command failed: ${command}`);
+            logger.error(`Error: ${error.message}`);
+            logger.error(`Exit code: ${error.code}`);
+            logger.error(`Signal: ${error.signal}`);
+            if (error.stdout) {
+                logger.error(`stdout: ${error.stdout}`);
+            }
+            if (error.stderr) {
+                logger.error(`stderr: ${error.stderr}`);
+            }
+        } else {
+            // Still log at verbose level for debugging
+            logger.verbose(`Command exited with non-zero code (suppressed): ${command}`);
+            logger.verbose(`Exit code: ${error.code}`);
         }
         throw error;
     }
