@@ -525,6 +525,10 @@ export const safeSyncBranchWithRemote = async (branchName: string, remote: strin
         if (!validateGitRef(remote)) {
             throw new Error(`Invalid remote name: ${remote}`);
         }
+        // Explicitly disallow remotes that look like command-line options (e.g. "--upload-pack")
+        if (remote.startsWith('-')) {
+            throw new Error(`Disallowed remote name (cannot start with '-'): ${remote}`);
+        }
 
         // Check current branch to restore later if needed
         const { stdout: currentBranch } = await runSecure('git', ['branch', '--show-current']);
