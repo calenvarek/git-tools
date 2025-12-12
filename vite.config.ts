@@ -45,7 +45,8 @@ export default defineConfig({
         dts({
             include: ['src/**/*'],
             exclude: ['tests/**/*', 'node_modules/**/*'],
-            rollupTypes: true,
+            outDir: 'dist',
+            insertTypesEntry: true,
         }),
     ],
     build: {
@@ -54,6 +55,7 @@ export default defineConfig({
         lib: {
             entry: './src/index.ts',
             formats: ['es'],
+            fileName: 'index',
         },
         rollupOptions: {
             external: [
@@ -61,13 +63,6 @@ export default defineConfig({
                 'shell-escape',
                 'winston'
             ],
-            input: 'src/index.ts',
-            output: {
-                format: 'esm',
-                entryFileNames: '[name].js',
-                preserveModules: true,
-                exports: 'named',
-            },
         },
         // Make sure Vite generates ESM-compatible code
         modulePreload: false,
