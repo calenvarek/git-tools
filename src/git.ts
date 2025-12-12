@@ -517,6 +517,14 @@ export const safeSyncBranchWithRemote = async (branchName: string, remote: strin
 }> => {
     const logger = getLogger();
 
+    // Sanitize branchName to prevent command injection
+    if (!validateGitRef(branchName) || branchName.startsWith('-')) {
+        return {
+            success: false,
+            error: `Invalid branch name: "${branchName}"`
+        };
+    }
+
     try {
         // Validate inputs first to prevent injection
         if (!validateGitRef(branchName)) {
