@@ -15,6 +15,7 @@ export {
 } from './logger';
 
 // Export child process execution functions
+export type { RunOptions } from './child';
 export {
     runSecure,
     runSecureWithInheritedStdio,
