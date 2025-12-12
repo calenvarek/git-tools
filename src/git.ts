@@ -8,6 +8,19 @@ import * as semver from 'semver';
 import { safeJsonParse, validatePackageJson } from './validation';
 
 /**
+ * Validates that a git remote name is safe (prevents option injection).
+ * Git remote names must not start with '-' and should match /^[A-Za-z0-9._\/-]+$/
+ */
+function isValidGitRemoteName(remote: string): boolean {
+    // Disallow starting dash, spaces, and only allow common git remote name characters.
+    // See: https://git-scm.com/docs/git-remote#_remotes
+    return typeof remote === 'string'
+        && remote.length > 0
+        && !remote.startsWith('-')
+        && /^[A-Za-z0-9._\/-]+$/.test(remote);
+}
+
+/**
  * Tests if a git reference exists and is valid (silent version that doesn't log errors)
  */
 const isValidGitRefSilent = async (ref: string): Promise<boolean> => {
@@ -516,6 +529,14 @@ export const safeSyncBranchWithRemote = async (branchName: string, remote: strin
     conflictResolutionRequired?: boolean;
 }> => {
     const logger = getLogger();
+
+    // Validate the remote parameter to prevent command injection
+    if (!isValidGitRemoteName(remote)) {
+        return {
+            success: false,
+            error: `Invalid remote name: '${remote}'`
+        };
+    }
 
     try {
         // Validate inputs first to prevent injection
