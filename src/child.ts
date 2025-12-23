@@ -47,21 +47,34 @@ function validateFilePath(filePath: string): boolean {
 }
 
 /**
+ * Options for runSecure command
+ */
+export interface RunSecureOptions extends child_process.SpawnOptions {
+    /** If true, suppresses error logging for non-zero exits (useful when non-zero exit is expected behavior) */
+    suppressErrorLogging?: boolean;
+}
+
+/**
  * Securely executes a command with arguments array (no shell injection risk)
  */
 export async function runSecure(
     command: string,
     args: string[] = [],
-    options: child_process.SpawnOptions = {}
+    options: RunSecureOptions = {}
 ): Promise<{ stdout: string; stderr: string }> {
     const logger = getLogger();
 
+    // Extract our custom option and pass the rest to spawn
+    const { suppressErrorLogging = false, ...spawnOptions } = options || {};
+
+    logger.debug(`runSecure: command="${command}" args=[${args.join(', ')}] suppressErrorLogging=${suppressErrorLogging}`);
+
     return new Promise((resolve, reject) => {
         logger.verbose(`Executing command securely: ${command} ${args.join(' ')}`);
-        logger.verbose(`Working directory: ${options?.cwd || process.cwd()}`);
+        logger.verbose(`Working directory: ${spawnOptions?.cwd || process.cwd()}`);
 
         const child = spawn(command, args, {
-            ...options,
+            ...spawnOptions,
             shell: false, // CRITICAL: Never use shell for user input
             stdio: 'pipe'
         });
@@ -90,15 +103,19 @@ export async function runSecure(
                 }
                 resolve({ stdout, stderr });
             } else {
-                logger.error(`Command failed with exit code ${code}`);
-                logger.error(`stdout: ${stdout}`);
-                logger.error(`stderr: ${stderr}`);
+                if (!suppressErrorLogging) {
+                    logger.error(`Command failed with exit code ${code}`);
+                    logger.error(`stdout: ${stdout}`);
+                    logger.error(`stderr: ${stderr}`);
+                }
                 reject(new Error(`Command "${[command, ...args].join(' ')}" failed with exit code ${code}`));
             }
         });
 
         child.on('error', (error) => {
-            logger.error(`Command failed to start: ${error.message}`);
+            if (!suppressErrorLogging) {
+                logger.error(`Command failed to start: ${error.message}`);
+            }
             reject(error);
         });
     });
@@ -156,6 +173,7 @@ export async function run(command: string, options: RunOptions = {}): Promise<{ 
     // Ensure encoding is set to 'utf8' to get string output instead of Buffer
     const finalOptions = { encoding: 'utf8' as const, ...execOptions };
 
+    logger.debug(`run: command="${command}" suppressErrorLogging=${suppressErrorLogging}`);
     logger.verbose(`Executing command: ${command}`);
     logger.verbose(`Working directory: ${finalOptions?.cwd || process.cwd()}`);
     logger.verbose(`Environment variables: ${Object.keys(finalOptions?.env || process.env).length} variables`);
@@ -185,9 +203,8 @@ export async function run(command: string, options: RunOptions = {}): Promise<{ 
                 logger.error(`stderr: ${error.stderr}`);
             }
         } else {
-            // Still log at verbose level for debugging
-            logger.verbose(`Command exited with non-zero code (suppressed): ${command}`);
-            logger.verbose(`Exit code: ${error.code}`);
+            // Still log at debug level for troubleshooting
+            logger.debug(`Command failed (suppressed): ${command} | Error: ${error.message}`);
         }
         throw error;
     }
