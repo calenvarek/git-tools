@@ -29,7 +29,7 @@ const isValidGitRefSilent = async (ref: string): Promise<boolean> => {
         if (!validateGitRef(ref)) {
             return false;
         }
-        await runSecure('git', ['rev-parse', '--verify', ref], { stdio: 'ignore' });
+        await runSecure('git', ['rev-parse', '--verify', ref], { stdio: 'ignore', suppressErrorLogging: true });
         return true;
     } catch {
         return false;
@@ -374,11 +374,11 @@ export const getDefaultFromRef = async (
 /**
  * Gets the default branch name from the remote repository
  */
-export const getRemoteDefaultBranch = async (): Promise<string | null> => {
+export const getRemoteDefaultBranch = async (cwd?: string): Promise<string | null> => {
     const logger = getLogger();
     try {
         // Try to get the symbolic reference for origin/HEAD
-        const { stdout } = await run('git symbolic-ref refs/remotes/origin/HEAD 2>/dev/null || echo ""');
+        const { stdout } = await run('git symbolic-ref refs/remotes/origin/HEAD 2>/dev/null || echo ""', { cwd, suppressErrorLogging: true });
         if (stdout.trim()) {
             // Extract branch name from refs/remotes/origin/branch-name
             const match = stdout.trim().match(/refs\/remotes\/origin\/(.+)$/);
@@ -390,7 +390,7 @@ export const getRemoteDefaultBranch = async (): Promise<string | null> => {
         }
 
         // Fallback: try to get it from ls-remote
-        const { stdout: lsRemoteOutput } = await run('git ls-remote --symref origin HEAD');
+        const { stdout: lsRemoteOutput } = await run('git ls-remote --symref origin HEAD', { cwd, suppressErrorLogging: true });
         const symrefMatch = lsRemoteOutput.match(/ref: refs\/heads\/(.+)\s+HEAD/);
         if (symrefMatch) {
             const branchName = symrefMatch[1];
@@ -403,6 +403,20 @@ export const getRemoteDefaultBranch = async (): Promise<string | null> => {
     } catch (error) {
         logger.debug(`Failed to get remote default branch: ${error}`);
         return null;
+    }
+};
+
+/**
+ * Checks if a directory is a git repository
+ * @param cwd Directory to check
+ * @returns true if directory is a git repository
+ */
+export const isGitRepository = async (cwd?: string): Promise<boolean> => {
+    try {
+        await run('git rev-parse --is-inside-work-tree', { cwd, suppressErrorLogging: true });
+        return true;
+    } catch {
+        return false;
     }
 };
 

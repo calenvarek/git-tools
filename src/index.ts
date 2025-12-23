@@ -54,6 +54,7 @@ export {
     getLinkedDependencies,
     getLinkCompatibilityProblems,
     getLinkProblems,
-    isNpmLinked
+    isNpmLinked,
+    isGitRepository
 } from './git';
 

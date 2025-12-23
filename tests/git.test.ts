@@ -805,7 +805,10 @@ describe('Git Utilities', () => {
             const result = await git.getRemoteDefaultBranch();
 
             expect(result).toBe('main');
-            expect(mockRun).toHaveBeenCalledWith('git symbolic-ref refs/remotes/origin/HEAD 2>/dev/null || echo ""');
+            expect(mockRun).toHaveBeenCalledWith(
+                'git symbolic-ref refs/remotes/origin/HEAD 2>/dev/null || echo ""',
+                { cwd: undefined, suppressErrorLogging: true }
+            );
         });
 
         it('should return branch name from ls-remote when symbolic ref fails', async () => {
@@ -816,7 +819,22 @@ describe('Git Utilities', () => {
             const result = await git.getRemoteDefaultBranch();
 
             expect(result).toBe('main');
-            expect(mockRun).toHaveBeenCalledWith('git ls-remote --symref origin HEAD');
+            expect(mockRun).toHaveBeenCalledWith(
+                'git ls-remote --symref origin HEAD',
+                { cwd: undefined, suppressErrorLogging: true }
+            );
+        });
+
+        it('should pass cwd to run if provided', async () => {
+            mockRun.mockResolvedValue({ stdout: 'refs/remotes/origin/main' });
+
+            const result = await git.getRemoteDefaultBranch('/custom/path');
+
+            expect(result).toBe('main');
+            expect(mockRun).toHaveBeenCalledWith(
+                'git symbolic-ref refs/remotes/origin/HEAD 2>/dev/null || echo ""',
+                { cwd: '/custom/path', suppressErrorLogging: true }
+            );
         });
 
         it('should return null when both methods fail', async () => {
@@ -843,7 +861,7 @@ describe('Git Utilities', () => {
             const result = await git.localBranchExists('feature-branch');
 
             expect(result).toBe(true);
-            expect(mockRunSecure).toHaveBeenCalledWith('git', ['rev-parse', '--verify', 'refs/heads/feature-branch'], { stdio: 'ignore' });
+            expect(mockRunSecure).toHaveBeenCalledWith('git', ['rev-parse', '--verify', 'refs/heads/feature-branch'], { stdio: 'ignore', suppressErrorLogging: true });
         });
 
         it('should return false when local branch does not exist', async () => {
@@ -862,7 +880,7 @@ describe('Git Utilities', () => {
             const result = await git.remoteBranchExists('feature-branch', 'origin');
 
             expect(result).toBe(true);
-            expect(mockRunSecure).toHaveBeenCalledWith('git', ['rev-parse', '--verify', 'refs/remotes/origin/feature-branch'], { stdio: 'ignore' });
+            expect(mockRunSecure).toHaveBeenCalledWith('git', ['rev-parse', '--verify', 'refs/remotes/origin/feature-branch'], { stdio: 'ignore', suppressErrorLogging: true });
         });
 
         it('should return false when remote branch does not exist', async () => {
@@ -878,7 +896,7 @@ describe('Git Utilities', () => {
 
             await git.remoteBranchExists('feature-branch');
 
-            expect(mockRunSecure).toHaveBeenCalledWith('git', ['rev-parse', '--verify', 'refs/remotes/origin/feature-branch'], { stdio: 'ignore' });
+            expect(mockRunSecure).toHaveBeenCalledWith('git', ['rev-parse', '--verify', 'refs/remotes/origin/feature-branch'], { stdio: 'ignore', suppressErrorLogging: true });
         });
     });
 
