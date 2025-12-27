@@ -21,6 +21,18 @@ function isValidGitRemoteName(remote: string): boolean {
 }
 
 /**
+ * Validates that a git branch name is safe to pass as a command-line argument.
+ * Branch names must not start with '-' and should match /^[A-Za-z0-9._\/-]+$/
+ * This prevents option injection such as '--upload-pack=...'.
+ */
+function isValidGitBranchName(branchName: string): boolean {
+    return typeof branchName === 'string'
+        && branchName.length > 0
+        && !branchName.startsWith('-')
+        && /^[A-Za-z0-9._/-]+$/.test(branchName);
+}
+
+/**
  * Tests if a git reference exists and is valid (silent version that doesn't log errors)
  */
 const isValidGitRefSilent = async (ref: string): Promise<boolean> => {
@@ -549,6 +561,14 @@ export const safeSyncBranchWithRemote = async (branchName: string, remote: strin
         return {
             success: false,
             error: `Invalid remote name: '${remote}'`
+        };
+    }
+
+    // Validate the branch name to prevent option injection (e.g., '--upload-pack=...')
+    if (!isValidGitBranchName(branchName)) {
+        return {
+            success: false,
+            error: `Invalid branch name: '${branchName}'`
         };
     }
 
