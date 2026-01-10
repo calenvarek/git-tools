@@ -1,6 +1,6 @@
 {
   "name": "@eldrforge/git-tools",
-  "version": "0.1.15",
+  "version": "0.1.16",
   "description": "Git utilities for automation - secure process execution and Git operations",
   "main": "dist/index.js",
   "type": "module",
@@ -15,7 +15,7 @@
   ],
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/calenvarek/git-tools.git"
+    "url": "git+https://github.com/grunnverk/git-tools.git"
   },
   "scripts": {
     "build": "npm run lint && tsc --noEmit && vite build",
@@ -35,7 +35,7 @@
     "process-execution",
     "secure-exec"
   ],
-  "author": "Calen Varek <calenvarek@gmail.com>",
+  "author": "Tim O'Brien <tobrien@discursive.com>",
   "license": "Apache-2.0",
   "dependencies": {
     "@types/semver": "^7.7.0",

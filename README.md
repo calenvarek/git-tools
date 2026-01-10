@@ -732,7 +732,7 @@ npm run watch
 
 ```bash
 # Clone the repository
-git clone https://github.com/calenvarek/git-tools.git
+git clone https://github.com/grunnverk/git-tools.git
 cd git-tools
 
 # Install dependencies
@@ -784,13 +784,13 @@ Apache-2.0 - see [LICENSE](LICENSE) file for details.
 
 ## Author
 
-**Calen Varek**
-Email: calenvarek@gmail.com
-GitHub: [@calenvarek](https://github.com/calenvarek)
+**Tim O'Brien**
+Email: tobrien@discursive.com
+GitHub: [@grunnverk](https://github.com/grunnverk)
 
 ## Related Projects
 
-This library was extracted from [kodrdriv](https://github.com/calenvarek/kodrdriv), an AI-powered Git workflow automation tool that uses these utilities for:
+This library was extracted from [kodrdriv](https://github.com/grunnverk/kodrdriv), an AI-powered Git workflow automation tool that uses these utilities for:
 
 - Automated commit message generation
 - Release note creation
@@ -803,6 +803,6 @@ See [RELEASE_NOTES.md](RELEASE_NOTES.md) for version history and changes.
 
 ## Support
 
-- 🐛 **Bug Reports**: [GitHub Issues](https://github.com/calenvarek/git-tools/issues)
-- 💬 **Questions**: [GitHub Discussions](https://github.com/calenvarek/git-tools/discussions)
-- 📧 **Email**: calenvarek@gmail.com
+- 🐛 **Bug Reports**: [GitHub Issues](https://github.com/grunnverk/git-tools/issues)
+- 💬 **Questions**: [GitHub Discussions](https://github.com/grunnverk/git-tools/discussions)
+- 📧 **Email**: tobrien@discursive.com
