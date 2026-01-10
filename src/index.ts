@@ -55,6 +55,10 @@ export {
     getLinkCompatibilityProblems,
     getLinkProblems,
     isNpmLinked,
-    isGitRepository
+    isGitRepository,
+    stageFiles,
+    unstageAll,
+    getStagedFiles,
+    verifyStagedFiles
 } from './git';
 

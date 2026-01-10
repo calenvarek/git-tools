@@ -1177,3 +1177,115 @@ export const isNpmLinked = async (packageDir: string): Promise<boolean> => {
     }
 };
 
+/**
+ * Stage specific files for commit
+ * @param files Array of file paths to stage
+ * @throws {Error} if any file path is invalid (import validation from shared)
+ * @throws {Error} if git command fails (import errors from shared)
+ */
+export async function stageFiles(files: string[]): Promise<void> {
+    const logger = getLogger();
+
+    if (files.length === 0) {
+        logger.warn('stageFiles called with empty file list');
+        return;
+    }
+
+    // Validate all file paths to prevent injection
+    // Note: validateFilePath is exported from child.ts
+    const { validateFilePath } = await import('./child');
+    for (const file of files) {
+        if (!validateFilePath(file)) {
+            throw new Error(`Invalid file path: ${file}`);
+        }
+    }
+
+    logger.debug(`Staging ${files.length} files...`);
+
+    try {
+        // Use -- to separate files from options (safety)
+        await runSecure('git', ['add', '--', ...files]);
+        logger.debug(`Successfully staged ${files.length} files`);
+    } catch (error: any) {
+        throw new Error(`Failed to stage files: ${error.message}`);
+    }
+}
+
+/**
+ * Unstage all currently staged files
+ * @throws {Error} if git command fails
+ */
+export async function unstageAll(): Promise<void> {
+    const logger = getLogger();
+
+    logger.debug('Unstaging all files...');
+
+    try {
+        await runSecure('git', ['reset', 'HEAD']);
+        logger.debug('Successfully unstaged all files');
+    } catch (error: any) {
+        throw new Error(`Failed to unstage files: ${error.message}`);
+    }
+}
+
+/**
+ * Get list of currently staged files
+ * @returns Array of file paths that are currently staged
+ * @throws {Error} if git command fails
+ */
+export async function getStagedFiles(): Promise<string[]> {
+    const logger = getLogger();
+
+    logger.debug('Getting list of staged files...');
+
+    try {
+        const { stdout } = await runSecure('git', [
+            'diff',
+            '--cached',
+            '--name-only'
+        ]);
+
+        const files = stdout
+            .trim()
+            .split('\n')
+            .filter(line => line.length > 0);
+
+        logger.debug(`Found ${files.length} staged files`);
+        return files;
+    } catch (error: any) {
+        throw new Error(`Failed to get staged files: ${error.message}`);
+    }
+}
+
+/**
+ * Verify that expected files are in the staging area
+ * @param expectedFiles Files that should be staged
+ * @returns Object with verification results
+ */
+export async function verifyStagedFiles(
+    expectedFiles: string[]
+): Promise<{ allPresent: boolean; missing: string[]; unexpected: string[] }> {
+    const logger = getLogger();
+
+    const stagedFiles = await getStagedFiles();
+    const stagedSet = new Set(stagedFiles);
+    const expectedSet = new Set(expectedFiles);
+
+    const missing = expectedFiles.filter(f => !stagedSet.has(f));
+    const unexpected = stagedFiles.filter(f => !expectedSet.has(f));
+
+    const allPresent = missing.length === 0 && unexpected.length === 0;
+
+    if (!allPresent) {
+        logger.warn('Stage verification mismatch:');
+        if (missing.length > 0) {
+            logger.warn(`  Missing: ${missing.join(', ')}`);
+        }
+        if (unexpected.length > 0) {
+            logger.warn(`  Unexpected: ${unexpected.join(', ')}`);
+        }
+    }
+
+    return { allPresent, missing, unexpected };
+}
+
